@@ -329,21 +329,24 @@ def main():
     ctrl.AddDevice(4)
     ctrl.AddDevice(5)
 
-    ctrl._synchronization = AcqSynch.SoftwareTrigger
+    print("LATENCY TIME: ", ctrl._em2.lowtime)
+
+    ctrl._synchronization = AcqSynch.SoftwareStart # AcqSynch.SoftwareTrigger
     # ctrl._synchronization = AcqSynch.HardwareTrigger
-    acqtime = 1.1
-    ctrl.PrepareOne(1, acqtime, 1, 0.1, 1)
-    ctrl.LoadOne(1, acqtime, 10, 1)
+    acqtime = 0.001
+    repetitions = 10
+    ctrl.PrepareOne(1, acqtime, repetitions, 0.1, 1)
     t0 = time.time()
-    ctrl.StartAllCT()
+    ctrl.StartAll()
     ctrl.StateAll()
     while ctrl.StateOne(1)[0] != State.On:
         ctrl.StateAll()
         time.sleep(0.1)
-    print(time.time() - t0 - acqtime)
+    print(time.time() - t0)
     ctrl.ReadAll()
     print(ctrl.ReadOne(2))
     return ctrl
+
 
 if __name__ == '__main__':
     main()
