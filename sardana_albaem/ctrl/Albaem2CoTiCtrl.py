@@ -151,8 +151,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         if value < 1e-4:
             raise ValueError('The minimum integration time is 0.1 ms')
 
-        if self._synchronization in [AcqSynch.SoftwareStart,
-                                     AcqSynch.HardwareStart]:
+        if self._synchronization in [AcqSynch.HardwareStart]:
             raise ValueError('The Start synchronization is not allowed yet')
 
         self._clean_variables()
@@ -166,6 +165,9 @@ class Albaem2CoTiCtrl(CounterTimerController):
         if self._synchronization in [AcqSynch.SoftwareGate,
                                      AcqSynch.SoftwareTrigger]:
             mode = 'SOFTWARE'
+            self._use_sw_trigger = True
+        elif self._synchronization == AcqSynch.SoftwareStart:
+            mode = 'AUTOTRIGGER'
             self._use_sw_trigger = True
         elif self._synchronization == AcqSynch.HardwareTrigger:
             mode = 'HARDWARE'
