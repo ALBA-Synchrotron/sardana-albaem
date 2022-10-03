@@ -246,6 +246,15 @@ class Em2(object):
     def timestamp_data(self, value):
         return self.command('TMST {0}'.format('True' if value else 'False'))
 
+    @property
+    def lowtime(self):
+        return self.command('ACQU:LOWT?')
+
+    @lowtime.setter
+    def lowtime(self, value):
+        return self.command('ACQU:LOWT {0}'.format(value))
+
+
     def start_acquisition(self, soft_trigger=True):
         self.command('ACQU:START' + (' SWTRIG' if soft_trigger else ''))
 
