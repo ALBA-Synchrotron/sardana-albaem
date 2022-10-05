@@ -322,8 +322,8 @@ class Albaem2CoTiCtrl(CounterTimerController):
 
 
 def main():
-    host = 'electproto38'
-    port = 6025
+    host = 'dctbl11albaem202'
+    port = 5025
     ctrl = Albaem2CoTiCtrl('test', {'AlbaEmHost': host, 'Port': port})
     ctrl.AddDevice(1)
     ctrl.AddDevice(2)
@@ -344,7 +344,11 @@ def main():
     while ctrl.StateOne(1)[0] != State.On:
         ctrl.StateAll()
         time.sleep(0.1)
-    print(time.time() - t0)
+
+    
+    expected_time = (acqtime + float(ctrl._em2.lowtime)/1000) * repetitions
+    print("Expected time: ", expected_time)
+    print("Real time:", time.time() - t0)
     ctrl.ReadAll()
     print(ctrl.ReadOne(2))
     return ctrl
