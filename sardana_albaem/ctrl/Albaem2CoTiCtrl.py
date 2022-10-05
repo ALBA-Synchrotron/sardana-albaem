@@ -158,7 +158,6 @@ class Albaem2CoTiCtrl(CounterTimerController):
         self._nb_points_expected_per_start = repetitions
         nb_points = repetitions * nb_starts
         self._acq_time = value
-        latency_time = latency
 
         # Select the trigger mode according to the synchronization mode
 
@@ -184,6 +183,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         self._em2.acquisition_time = self._acq_time
         self._em2.trigger_mode = mode
         self._em2.nb_points = nb_points
+        self._em2.lowtime = latency
         # This controller is not ready to use the timestamp
         self._em2.timestamp_data = False
 
