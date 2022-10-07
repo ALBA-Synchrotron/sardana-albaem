@@ -248,11 +248,11 @@ class Em2(object):
 
     @property
     def lowtime(self):
-        return self.command('ACQU:LOWT?')
+        return float(self.command('ACQU:LOWT?')) * 1E-3
 
     @lowtime.setter
     def lowtime(self, value):
-        return self.command('ACQU:LOWT {0}'.format(value))
+        return self.command('ACQU:LOWT {0}'.format(value*1E3))
 
     def start_acquisition(self, soft_trigger=True):
         self.command('ACQU:START' + (' SWTRIG' if soft_trigger else ''))
