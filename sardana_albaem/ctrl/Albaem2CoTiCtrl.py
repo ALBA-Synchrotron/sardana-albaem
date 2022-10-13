@@ -240,10 +240,9 @@ class Albaem2CoTiCtrl(CounterTimerController):
 
 
         if self._synchronization in [AcqSynch.SoftwareTrigger,
-                                AcqSynch.SoftwareGate]:
+                                     AcqSynch.SoftwareGate,
+                                     AcqSynch.SoftwareStart]:
             # Fix issue with the electromether (EL-15157)  pow(2, np.log2(np.ceil(int_time/2.61)))
-            # TODO: Check if AcqSynch.SoftwareStart also needs to be in this
-            #  fix
             if (axis != 0 
                     and self._em2_software_version >= (2, 0, 0)
                     and self._em2_software_version < (2, 1, 0)):
