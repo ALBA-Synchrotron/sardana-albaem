@@ -4,11 +4,30 @@ import time
 from sardana import State, DataAccess
 from sardana.pool import AcqSynch
 from sardana.pool.controller import CounterTimerController, Type, Access, \
-    Description, Memorize, Memorized, NotMemorized
+    Description, DefaultValue, Memorize, Memorized, NotMemorized
 from sardana.sardanavalue import SardanaValue
+from functools import wraps
 
-from sardana_albaem.ctrl.em2 import Em2
+from sardana_albaem.ctrl.em2 import Em2, ZMQ_STREAMING_PORT
 
+
+def debug_it(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        self._log.debug(
+            "Entering {} with args={}, kwargs={} ...".format(
+                func.__name__, args, kwargs
+            )
+        )
+        output = func(self, *args, **kwargs)
+        self._log.debug(
+            "Leaving {} without error ... with output {} ...".format(
+                func.__name__, output
+            )
+        )
+        return output
+
+    return wrapper
 
 __all__ = ['Albaem2CoTiCtrl']
 
@@ -27,22 +46,26 @@ class Albaem2CoTiCtrl(CounterTimerController):
             Type: str
         },
         'Port': {
-            Description: 'AlbaEm Host name',
+            Description: 'AlbaEm control port (SCPI)',
             Type: int
         },
+        'ZmqPort': {
+            Description: 'AlbaEm streaming port (ZMQ)',
+            Type: int,
+            DefaultValue: ZMQ_STREAMING_PORT
+        }
     }
 
     ctrl_attributes = {
         'ExtTriggerInput': {
-            Type: str,
             Description: 'ExtTriggerInput',
+            Type: str,
             Access: DataAccess.ReadWrite,
             Memorize: Memorized
         },
         'AcquisitionMode': {
             Type: str,
-            # TODO define the modes names ?? (I_AVGCURR_A, Q_CHARGE_C)
-            Description: 'Acquisition Mode: CHARGE, INTEGRATION',
+            Description: 'Acquisition Mode: CHARGE, CURRENT, STREAMING',
             Access: DataAccess.ReadWrite,
             Memorize: Memorized
         },
@@ -83,11 +106,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         msg = "__init__(%s, %s): Entering...", repr(inst), repr(props)
         self._log.debug(msg)
 
-        self._em2 = Em2(self.AlbaEmHost, self.Port)
-        self._em2_software_version = self._em2.software_version
-        if (not isinstance(self._em2_software_version, tuple) 
-                or len(self._em2_software_version) != 3):
-            raise ValueError("software version format must be (x, y, z)")
+        self._em2 = Em2(self.AlbaEmHost, self.Port, self.ZmqPort)
         self._synchronization = AcqSynch.SoftwareTrigger
         self._latency_time = 0.001  # In fact, it is just 320us
         self._use_sw_trigger = True
@@ -97,17 +116,13 @@ class Albaem2CoTiCtrl(CounterTimerController):
         self._nb_points_expected_per_start = 0
         self._nb_points_fetched = 0
         self._new_data = {}
-        self._nb_start = 0
         self._state = State.On
         self._status = 'On'
 
         self.formulas = {1: 'value', 2: 'value', 3: 'value', 4: 'value'}
 
     def _clean_variables(self):
-        status = self._em2.acquisition_state
-        if status in ['ACQUIRING', 'RUNNING']:
-            self._em2.stop_acquisition()
-
+        self._em2.stop_acquisition()
         self._use_sw_trigger = True
         self._new_data = {}
         self._started = False
@@ -120,6 +135,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         """Return EM2 Channel object for the given controller axis"""
         return self._em2[axis - 2]
 
+    @debug_it
     def StateAll(self):
         """Read state of all axis."""
         hardware_state = self._em2.acquisition_state
@@ -142,10 +158,12 @@ class Albaem2CoTiCtrl(CounterTimerController):
                 self._log.warning('Data not ready, but HW status is ON - forcing ReadAll')
                 self.ReadAll()
 
+    @debug_it
     def StateOne(self, axis):
         """Read state of one axis."""
         return self._state, self._status
 
+    @debug_it
     def PrepareOne(self, axis, value, repetitions, latency, nb_starts):
         # Protection for the integration time
         if value < 1e-4:
@@ -153,6 +171,12 @@ class Albaem2CoTiCtrl(CounterTimerController):
 
         if self._synchronization in [AcqSynch.HardwareStart]:
             raise ValueError('The Start synchronization is not allowed yet')
+        if self._em2.zmq_streaming_required:
+            if not self._em2.zmq_streaming_supported:
+                raise ValueError(
+                    "ZMQ streaming not supported by this version of "
+                    "electrometer software.  Change acquisition mode to a "
+                    "non-streaming mode, e.g., 'CURRENT'")
 
         self._clean_variables()
         self._nb_points_expected_per_start = repetitions
@@ -187,10 +211,12 @@ class Albaem2CoTiCtrl(CounterTimerController):
         # This controller is not ready to use the timestamp
         self._em2.timestamp_data = False
 
+    @debug_it
     def LoadOne(self, axis, integ_time, repetitions, latency_time):
         # Configure the electrometer on the PrepareOne
         pass
 
+    @debug_it
     def PreStartOne(self, axis, value):
         # Check if the communication is stable before start
         try:
@@ -200,6 +226,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
             return False
         return True
 
+    @debug_it
     def StartAll(self):
         self._nb_points_read_per_start = 0
         if not self._started:
@@ -208,6 +235,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         if self._use_sw_trigger:
             self._em2.software_trigger()
 
+    @debug_it
     def ReadAll(self):
         # TODO Change the ACQU:MEAS command by CHAN:CURR
         nb_points_ready = self._em2.nb_points_ready
@@ -230,32 +258,30 @@ class Albaem2CoTiCtrl(CounterTimerController):
             except Exception as e:
                 raise Exception('ReadAll error: {0}'.format(e))
 
+    @debug_it
     def ReadOne(self, axis):
-        # self._log.debug("ReadOne(%d): Entering...", axis)
         if len(self._new_data) == 0:
-            return None
+            # TODO: Check with hardaware synchronization
+            if self._synchronization in [AcqSynch.SoftwareTrigger,
+                                         AcqSynch.SoftwareGate]:
+                return None
+            else:
+                return []
+
         axis -= 1
         channel = 'CHAN0{0}'.format(axis)
         values = list(self._new_data[channel])
 
-
         if self._synchronization in [AcqSynch.SoftwareTrigger,
                                      AcqSynch.SoftwareGate,
                                      AcqSynch.SoftwareStart]:
-            # Fix issue with the electromether (EL-15157)  pow(2, np.log2(np.ceil(int_time/2.61)))
-            if (axis != 0 
-                    and self._em2_software_version >= (2, 0, 0)
-                    and self._em2_software_version < (2, 1, 0)):
-                factor = pow(2,int.bit_length(int(self._acq_time/2.621441)))
-            else:
-                factor = 1
-            self._log.debug('ReadOne value: {}, tune {}'.format(values[0], factor))
-            return SardanaValue(values[0] * factor)
+            return SardanaValue(values[0])
 
         else:
             self._new_data[channel] = []
             return values
 
+    @debug_it
     def AbortOne(self, axis):
         if not self._aborted:
             self._aborted = True
@@ -265,6 +291,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
 #                Axis Extra Attribute Methods
 ###############################################################################
 
+    @debug_it
     def GetAxisExtraPar(self, axis, name):
         self._log.debug("GetExtraAttributePar(%d, %s): Entering...", axis,
                         name)
@@ -282,6 +309,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         elif name == 'formula':
             return self.formulas[axis-1]
 
+    @debug_it
     def SetAxisExtraPar(self, axis, name, value):
         if axis == 1:
             raise ValueError('The axis 1 does not use the extra attributes')
@@ -300,6 +328,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
 #                Controller Extra Attribute Methods
 ###############################################################################
 
+    @debug_it
     def SetCtrlPar(self, parameter, value):
         param = parameter.lower()
         if param == 'exttriggerinput':
@@ -309,6 +338,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         else:
             CounterTimerController.SetCtrlPar(self, parameter, value)
 
+    @debug_it
     def GetCtrlPar(self, parameter):
         param = parameter.lower()
         if param == 'exttriggerinput':
@@ -350,7 +380,7 @@ def main():
     print("Real time:", time.time() - t0)
     ctrl.ReadAll()
     print(ctrl.ReadOne(2))
-    return ctrl
+
 
 
 if __name__ == '__main__':

@@ -19,17 +19,12 @@
 #     along with this program.  If not, see [http://www.gnu.org/licenses/].
 ###############################################################################
 
-import sys
 from setuptools import setup, find_packages
-
-PY34 = sys.version_info >= (3, 4)
 
 
 def main():
     """Main method collecting all the parameters to setup."""
     name = "sardana-albaem"
-
-    version = "0.0.14"
 
     description = "AlbaEM Sardana Controller"
 
@@ -39,18 +34,24 @@ def main():
 
     license = "GPLv3"
 
-    url = "http://www.maxiv.lu.se"
+    url = "https://gitlab.maxiv.lu.se/kits-maxiv/sardana-albaem"
 
     packages = find_packages()
 
     # Add your dependencies in the following line.
-    install_requires = ['sardana', 'sockio']
+    install_requires = [
+        "sardana",
+        "sockio",
+        "pyzmq<20.0; python_version<'3'",
+        "pyzmq; python_version>='3'",
+    ]
 
-    python_requires = '>=2.7'
+    python_requires = ">=2.7"
 
     setup(
         name=name,
-        version=version,
+        use_scm_version=True,
+        setup_requires=["setuptools_scm"],
         description=description,
         author=author,
         author_email=author_email,
