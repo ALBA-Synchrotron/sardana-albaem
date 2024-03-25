@@ -75,7 +75,7 @@ class Albaem2CoTiCtrl(CounterTimerController):
         "Range": {
             Type: str,
             Description: 'Range for the channel',
-            Memorize: NotMemorized,
+            Memorize: Memorized,
             Access: DataAccess.ReadWrite,
         },
         "Inversion": {
