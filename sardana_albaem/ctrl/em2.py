@@ -332,10 +332,6 @@ class Em2(object):
         return data
 
     def _correct_for_long_acquisition_scaling_bug(self, data):
-        # TODO: Check if it is needed with Hardware synchronization the
-        #  original controller (Alba version) does it only in this mode
-        if self._trigger_mode == 'HARDWARE':
-            return data
         nb_samples_without_overflow = 8192
         adc_raw_sampling_rate = 200e3  # Hz
         adc_oversampling_factor = 64
@@ -350,11 +346,6 @@ class Em2(object):
             factor = 2 ** nb_bits_lost_for_overflow
             corrected_data = {}
             for channel, values in data.items():
-                # TODO: Check if the correction is needed for all channel,
-                #  original Alba version does not do it for chan00 timer
-                if channel == 'CHAN00':
-                    corrected_data[channel] = list(values)
-                    continue
                 corrected_data[channel] = [v * factor for v in values]
         else:
             corrected_data = data
