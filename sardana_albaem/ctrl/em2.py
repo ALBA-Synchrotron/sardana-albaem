@@ -346,11 +346,6 @@ class Em2(object):
             factor = 2 ** nb_bits_lost_for_overflow
             corrected_data = {}
             for channel, values in data.items():
-                # TODO: Check if the correction is needed for all channel,
-                #  original Alba version does not do it for chan00 timer
-                if channel == 'CHAN00':
-                    corrected_data[channel] = list(values)
-                    continue
                 corrected_data[channel] = [v * factor for v in values]
         else:
             corrected_data = data
