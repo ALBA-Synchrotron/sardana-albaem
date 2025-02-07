@@ -332,10 +332,6 @@ class Em2(object):
         return data
 
     def _correct_for_long_acquisition_scaling_bug(self, data):
-        # TODO: Check if it is needed with Hardware synchronization the
-        #  original controller (Alba version) does it only in this mode
-        if self._trigger_mode == 'HARDWARE':
-            return data
         nb_samples_without_overflow = 8192
         adc_raw_sampling_rate = 200e3  # Hz
         adc_oversampling_factor = 64
