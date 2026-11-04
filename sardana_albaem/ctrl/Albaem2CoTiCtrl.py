@@ -192,6 +192,9 @@ class Albaem2CoTiCtrl(CounterTimerController):
         elif self._synchronization == AcqSynch.SoftwareStart:
             mode = 'AUTOTRIGGER'
             self._use_sw_trigger = False
+            if nb_starts > 1:
+                self._use_sw_start_trigger = True
+                nb_points = repetitions
         elif self._synchronization == AcqSynch.HardwareTrigger:
             mode = 'HARDWARE'
             self._use_sw_trigger = False
@@ -229,7 +232,8 @@ class Albaem2CoTiCtrl(CounterTimerController):
     @debug_it
     def StartAll(self):
         self._nb_points_read_per_start = 0
-        if not self._started:
+        if not self._started or self._use_sw_start_trigger:
+            self._nb_points_fetched = 0
             self._em2.start_acquisition(soft_trigger=False)
             self._started = True
         if self._use_sw_trigger:
